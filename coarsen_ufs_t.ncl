@@ -1,4 +1,4 @@
-;coarsen_ufs_manyt.ncl
+;coarsen_ufs_t.ncl
 
 ;================================================================================
 ;   Copyright 2021 Hannah M. Christensen
@@ -17,17 +17,12 @@
 ;================================================================================
 
 ; Revised by Xia Sun, Sep 2023
-; usage: ncl coarsen_ufs_t.ncl
+; Revised by Julia Simonson, May 2025
+; usage: ncl coarsen_ufs_t_yyyymmdd_hourin.ncl
 
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/contributed.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/esmf/ESMF_regridding.ncl"
-
-; function ismissing (
-;     data       
-; )
-; return_val [dimsizes(data)] :  logical
-
 
 load "func_read_hires.ncl"
 load "func_coords_in.ncl"
@@ -36,31 +31,9 @@ load "add_to_file.ncl"
 load "func_advection.ncl"
 load "func_advtend.ncl"
 load "func_geostrophic.ncl"
-; load "func_thetal.ncl"
 
 
 begin
-
-  ;===================================;
-  ; check input information from CLI  ;
-  ;===================================;
-
-    ; if (.not. isdefined("datein") .or. \
-    ;     .not. isdefined("hourin")) then
-    ;   print("usage: ncl coarsen_ufs_manyt.ncl datein=yyyymmdd hourin=i")
-    ;   exit()
-    ; end if
-
-    ; if ((hourin .ne. 0) .and. (hourin .ne. 1) .and. (hourin .ne. 2) .and. (hourin .ne. 3) \
-    ;                     .and. (hourin .ne. 4) .and. (hourin .ne. 5) .and. (hourin .ne. 6) \
-    ;                     .and. (hourin .ne. 7)    ) then
-    ;   print("error: hourin must be integer between 0 and 7")
-    ;   exit()
-    ; end if
-
-  ;=======================================================
-  ; User defined variables
-
 
   ;===================================;
   ; define coarsening resolution      ;
@@ -78,7 +51,7 @@ begin
   ;===================================;
 
     t_step_out = t_step_in*60*60       ; in seconds.  Ensure integer.
-    flag_interp_time   = False             ; for DEPHY, we will not perform interpolation
+    flag_interp_time   = False         ; for DEPHY, we will not perform interpolation
 
   ;===================================;
   ; define optional smoothing         ;
@@ -128,21 +101,15 @@ begin
   ; define code version               ;
   ;===================================;
 
-  version = "v1.0"
+    version = "v1.0"
 
   ;===================================;
   ; define paths to input variables   ;
   ;===================================;
 
-    generic_path     = "/home/Xia.Sun/scratch1/MU-MIP/cg-ufs/srw_test/CG"
-   ; timestep_path    = (/ 20160812 , 20160812 , 20160812 , 20160812 , 20160812 , 20160812 , 20160812 , 20160812/) ; time in file name
-   ; timestep_idx     = (/        0 ,        1 ,        2 ,        3 ,        4 ,        5 ,        6 ,        7 /) ; time idx in file
-   ; timestep_path    = (/ 20160812, 20160812,20160812/) ; time in file name
-   ;timestep_idx     = (/      0,  1, 2/) ; time idx in file
-   timestep_path    = (/ YYYYMMDD/) ; time in file name
-   timestep_idx     = (/ TIME_IDX/) ; time idx in file    
-    ; timestep_path = (/ datein /)
-    ; timestep_idx  = (/ hourin /)
+    generic_path     = "/scratch2/BMC/fv3lam/MUMIP/expt_dirs/cg-ufs/CG"
+    timestep_path    = (/ YYYYMMDD/) ; time in file name
+    timestep_idx     = (/ TIME_IDX/) ; time idx in file    
     time_ref         = todouble(2016080100)      ; all times ref to this time
     filename         = "srw.t12z.natlev."
     filename_sfc     = "rrfs.t00z.prslev.f006."
@@ -152,13 +119,11 @@ begin
   ; define paths to output files      ;
   ;===================================;
 
-    path_out     = "/home/Xia.Sun/scratch1/MU-MIP/cg-ufs/srw_test/SCM_in"          ; Output directory
-   file_out_tmp = (/"mumip_ufs_3km_IO.", \
+    path_out     = "/scratch2/BMC/fv3lam/MUMIP/expt_dirs/cg-ufs/SCM_in"          ; Output directory
+    file_out_tmp = (/"mumip_ufs_3km_IO.", \
                     CG_resol,"_",\
                     tostring(timestep_path(0)),".",tostring(t_step_in*timestep_idx(0)),\
                     ".nc"/)                                                   ; Output file name
-    ; file_out_tmp = (/"mumip_ufs_",UFS_resol,"_",region,"_",CG_resol,"_",\
-    ;                  tostring(timestep_path),".",tostring_with_format(t_step_in*timestep_idx, "%0.2i"),"_",version,".nc"/) 
     file_out = str_concat(file_out_tmp)
     delete([/file_out_tmp/])
 
@@ -189,27 +154,12 @@ begin
 
     ; Input variable dimensions: (time, latitude, longitude) ;
     in_file        = addfile(data_path,"r")
-    ;; GRIB changes
-    ;;lev_data_tmp   = in_file->HHL(0,:,:,:)
-    ;;height_data_tmp = lev_data_tmp
-    ;;lsm_data_tmp   = in_file->FR_LAND(0,:,:)
-    ;;zorog_data_tmp = in_file->HSURF(0,:,:)
-    ;;z0_data_tmp    = in_file->Z0(0,:,:)
-    ;;=======ICON variables
-    ; lev_data_tmp   = in_file->zg(0,:,:,:)
-    ; height_data_tmp = lev_data_tmp
-    ; lsm_data_tmp   = in_file->lsm(0,:,:)
-    ; zorog_data_tmp = in_file->zg_2(0,:,:)
-    ; z0_data_tmp    = in_file->sr(0,:,:)
-
     ;;=======UFS variables
     lev_data_tmp   = in_file->gh(0,:,:,:)
     height_data_tmp = lev_data_tmp
     lsm_data_tmp   = in_file->LAND_surface(0,:,:)
     zorog_data_tmp = in_file->HGT_surface(0,:,:)
     z0_data_tmp    = in_file->SFCR_surface(0,:,:)
-
-    ; lev=in_file->lev
 
     print(lsm_data_tmp)
 
@@ -366,14 +316,12 @@ begin
 
 ;;  This part needs revisit-Sun, Aug 2023
 ;;  It seems we don't have to. calculate any half-lev variables for UFS LAM outputs-Sun, Sep 2023
-    ; array_4dh_out = new((/n_time_out,n_lev_out+1,n_lat_out,n_lon_out/),float)
     array_4dh_out = new((/n_time_out,n_lev_out,n_lat_out,n_lon_out/),float)
     array_4dh_out!0 = "time"
     array_4dh_out!1 = "lev"
     array_4dh_out!2 = "lat"
     array_4dh_out!3 = "lon"
     array_4dh_out&time = time_out
-    ; array_4dh_out&lev  = levh_in
     array_4dh_out&lev  = lev_out
     array_4dh_out&lat  = lat_out
     array_4dh_out&lon  = lon_out
@@ -400,22 +348,11 @@ begin
     system("/bin/rm -f " + path_out + "/" + file_out)    ; remove if exists
     fout  = addfile (path_out + "/" + file_out, "c")  ; open output file - create
 
-;    fout  = addfile (path_out + file_out, "w")  ; open output file - read and write
-
   ;===================================================================
   ; explicitly declare file definition mode. Improve efficiency.
 
     setfileoption(fout,"DefineMode",True)
 
-;  ;===================================================================
-;  ; create global attributes of the file
-;
-;    fAtt               = True            ; assign file attributes
-;    fAtt@title         = "SCM input file derived from DYAMOND summer ICON 2.5 km simulation"
-;    fAtt@Conventions   = "None"
-;    fAtt@creation_date = systemfunc ("date")
-;    fileattdef( fout, fAtt )            ; copy file attributes
-;
   ;===================================================================
   ; predefine the coordinate variables and their dimensionality
   ; Note: to get an UNLIMITED record dimension, we set the dimensionality
@@ -438,8 +375,6 @@ begin
     add_to_file(fout,zorog_data_out       ,"zorog")
     add_to_file(fout,z0_data_out          ,"z0")
     add_to_file(fout,land_mask            ,"land_erase_flag")
-;    add_to_file(fout,date                 , "date")
-;    add_to_file(fout,second               , "second")
 
     ;=============================================================
     delete([/file_out,path_out/])
@@ -450,9 +385,7 @@ begin
 
     print("pressure calculation")
 
-    ; filetype = "atm_3d"
     variable_file = "PRES"  ; name of file
-;    variable_name = "P"     ; name in file
     variable_name = "pres"
 
     ; initialise: time, lev, lat, lon
@@ -504,7 +437,6 @@ begin
     print("temperature calculation")
 
     variable_file = "TMP"  ; name of file
-   ; variable_name = "T"     ; name in file
     variable_name = "t"     ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -667,14 +599,11 @@ begin
     print("vertical velocity calculation")
 
     variable_file = "DZDT"  ; name of file
-    ;variable_name = "W"     ; name in file
     variable_name = "wz"     ; name in file
 
     ; initialise: time, lev, lat, lon
-    ; wh_data_out = array_4dh_out ;does UFS grib2 need this? I don;t think so at this time, Sun Aug 2023
     w_data_out = array_4d_out
     ; loop over vertical half levels
-    ; do lev_count = 0,n_lev_in
     do lev_count = 0,n_lev_in-1
       w_tmp = func_read_hires(generic_path,timestep_path,timestep_idx,t_step_in,time_in,filename,variable_file,variable_name,CG_resol,UFS_exp,region,lev_count)
       w_data_out(time|:,lev|lev_count,lat|:,lon|:) = func_reduce_area(w_tmp,flag_subset,set_lat_min,set_lat_max,set_lon_min,set_lon_max,3)
@@ -682,8 +611,6 @@ begin
     end do
 
     ; vertical coordinate. on half levels. Interpolate to full levels ; this is done for ICON, not sure it still applies to UFS
-    ; w_data_out=0.5*(wh_data_out(:,0:n_lev_in-1,:,:)+wh_data_out(:,1:n_lev_in,:,:))
-    ; copy_VarCoords(array_4d_out,w_data_out)
     w_data_out@long_name="Vertical Velocity (w)"
     w_data_out@units="m s-1"
 
@@ -723,14 +650,11 @@ begin
     print("vertical pressure velocity calculation")
 
     variable_file = "VVEL"  ; name of file
-    ;variable_name = "W"     ; name in file
     variable_name = "w"     ; name in file
 
     ; initialise: time, lev, lat, lon
-    ; wh_data_out = array_4dh_out ;does UFS grib2 need this? I don;t think so at this time, Sun Aug 2023
     wp_data_out = array_4d_out
     ; loop over vertical half levels
-    ; do lev_count = 0,n_lev_in
     do lev_count = 0,n_lev_in-1
       wp_tmp = func_read_hires(generic_path,timestep_path,timestep_idx,t_step_in,time_in,filename,variable_file,variable_name,CG_resol,UFS_exp,region,lev_count)
       wp_data_out(time|:,lev|lev_count,lat|:,lon|:) = func_reduce_area(wp_tmp,flag_subset,set_lat_min,set_lat_max,set_lon_min,set_lon_max,3)
@@ -738,8 +662,6 @@ begin
     end do
 
     ; vertical coordinate. on half levels. Interpolate to full levels ; this is done for ICON, not sure it still applies to UFS
-    ; w_data_out=0.5*(wh_data_out(:,0:n_lev_in-1,:,:)+wh_data_out(:,1:n_lev_in,:,:))
-    ; copy_VarCoords(array_4d_out,w_data_out)
     wp_data_out@long_name="Vertical Pressure Velocity"
     wp_data_out@units="Pa s-1"
 
@@ -780,7 +702,6 @@ begin
     print("U wind calculation")
 
     variable_file = "UGRD"  ; name of file
-    ;variable_name = "U"     ; name in file
     variable_name = "u"     ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -832,7 +753,6 @@ begin
     print("V wind calculation")
 
     variable_file = "VGRD"  ; name of file
- ;   variable_name = "V"     ; name in file
     variable_name = "v"     ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -896,7 +816,6 @@ begin
     print("qv calculation")
 
     variable_file = "SPFH"  ; name of file
-    ;variable_name = "QV"     ; name in file
     variable_name = "q"     ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -944,7 +863,6 @@ begin
     print("ql calculation")
 
     variable_file = "ql"  ; name of file
-   ; variable_name = "QC_DIA"     ; name in file
     variable_name = "ql"     ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -991,7 +909,6 @@ begin
     print("qi calculation")
 
     variable_file = "qi"  ; name of file
-    ;variable_name = "QI_DIA"     ; name in file
     variable_name = "qi"    ; name in file
 
     ; initialise: time, lev, lat, lon
@@ -1247,17 +1164,6 @@ begin
     delete([/rv_data_out,rl_data_out,ri_data_out,rt_data_out/])
 
   ;==================================================================================
-  ; param 3c. thetal **estimate**
-
-    ; if (.not. flag_accurate_thetal) then
-
-    ;    print("thetal estimate")
-
-    ;    func_thetal(fout)
-
-    ; end if
-
- ;==================================================================================
   ; param 7. Advective Tendencies
   ;          Calculate this from the coarse grained T, U, V fields
 
@@ -1284,8 +1190,6 @@ begin
 
     print("surface sensible heat flux calculation")
 
-    ;variable_file = "SHFL_S"  ; name of file
-    ;variable_name = "SHFL_S"  ; name in file
     variable_file = "SHTFL"  ; name of file
     variable_name = "ishf"  ; name in file
 
@@ -1295,9 +1199,6 @@ begin
     shfl_tmp = func_read_hires(generic_path,timestep_path,timestep_idx,t_step_in,time_in,filename,variable_file,variable_name,CG_resol,UFS_exp,region,999)
     shfl_data_out(time|:,lat|:,lon|:) = func_reduce_area(shfl_tmp,flag_subset,set_lat_min,set_lat_max,set_lon_min,set_lon_max,3)
     delete([/shfl_tmp/])
-
-    ; DEPHY sign convention: positive upwards
-    ; shfl_data_out = -1.0*shfl_data_out
 
     ; Erase land if required ===========================;
     shfl_data_out@_FillValue = default_fillvalue("float")
@@ -1336,8 +1237,6 @@ begin
 
     print("surface latent heat flux calculation")
 
-    ;variable_file = "LHFL_S"  ; name of file
-    ;variable_name = "LHFL_S"  ; name in file
     variable_file = "LHTFL"  ; name of file
     variable_name = "lhtfl"  ; name in file
 
@@ -1347,9 +1246,6 @@ begin
     lhfl_tmp = func_read_hires(generic_path,timestep_path,timestep_idx,t_step_in,time_in,filename,variable_file,variable_name,CG_resol,UFS_exp,region,999)
     lhfl_data_out(time|:,lat|:,lon|:) = func_reduce_area(lhfl_tmp,flag_subset,set_lat_min,set_lat_max,set_lon_min,set_lon_max,3)
     delete([/lhfl_tmp/])
-
-    ; DEPHY sign convention: positive upwards
-    ; lhfl_data_out = -1.0*lhfl_data_out
 
    ; Erase land if required ===========================;
     lhfl_data_out@_FillValue = default_fillvalue("float")
@@ -1388,8 +1284,6 @@ begin
 
     print("surface temperature calculation")
 
-    ;variable_file = "T_G"  ; name of file
-    ;variable_name = "T_G"  ; name in file
     variable_file = "ts"  ; name of file
     variable_name = "t"  ; name in file
 
@@ -1437,8 +1331,6 @@ begin
 
     print("surface pressure calculation")
 
-    ;variable_file = "PS"  ; name of file
-    ;variable_name = "PS"  ; name in file
     variable_file = "ps"  ; name of file
     variable_name = "sp"  ; name in file
 
@@ -1487,8 +1379,6 @@ begin
     print("ustar calculation")
 
     ;;--- u momentum flux
-    ;variable_file = "UMFL_S"  ; name of file
-    ;variable_name = "UMFL_S"  ; name in file
     variable_file = "UFLX"  ; name of file
     variable_name = "uflx"  ; name in file
   
@@ -1526,9 +1416,7 @@ begin
     end if
 
 
-       ;;--- v momentum flux
-    ;variable_file = "VMFL_S"  ; name of file
-    ;variable_name = "VMFL_S"  ; name in file
+    ;;--- v momentum flux
     variable_file = "VFLX"  ; name of file
     variable_name = "vflx"  ; name in file
 
@@ -1584,8 +1472,6 @@ begin
     print("assorted fields for verification")
 
     ;--- cloud cover
-    ;variable_file = "CLCT"  ; name of file
-    ;variable_name = "CLCT"  ; name in file
     variable_file = "TCDC"          ; name of file
     variable_name = "tcc"          ; name in file
 
@@ -1627,9 +1513,7 @@ begin
 
     delete([/variable_file,variable_name,clct_data_out/])
 
-   ;--- precip
-    ;variable_file = "TOT_PREC"  ; name of file
-    ;variable_name = "TOT_PREC"  ; name in file
+    ;--- precip
     variable_file = "APCP"  ; name of file
     variable_name = "tp"  ; name in file
 
@@ -1668,8 +1552,6 @@ begin
 
     delete_VarAtts(tot_prec_data_out,(/"param","time"/))
     ; inherited unit is dodgy, for some reason. This is an accumulated field
-    ; tot_prec_data_out@long_name = "Total precipitation (accumulated since parent model start)"
-    ; tot_prec_data_out@comment   = "Nb. parent ICON run starts on 1 August 2016"
     tot_prec_data_out@long_name = "Total precipitation (5-6 hour acc fcst)"
     tot_prec_data_out@units     = "kg/m2"
 
@@ -1677,9 +1559,7 @@ begin
 
     delete([/variable_file,variable_name,tot_prec_data_out/])
 
-     ;--- surface specific humidity
-    ;variable_file = "QV_S"  ; name of file
-    ;variable_name = "QV_S"  ; name in file
+    ;--- surface specific humidity
     variable_file = "qv_s"  ; name of file
     variable_name = "q"  ; name in file
 
@@ -1798,11 +1678,8 @@ begin
 
     ; surface forcing with sensible and latent heat fluxes provided (sfc_sens_flx and sfc_lat_flx)
     ; plus prescribed surface temperature (ts is a variable of the file)
-    ; globalAtt@surfaceForcing = "surfaceFlux/ts"
     globalAtt@surfaceType = "ocean"
     globalAtt@surfaceForcing = "surfaceFlux"
-    ; z0 roughness length provided as well as ustar
-    ; globalAtt@surfaceForcingWind = "z0/ustar"
     globalAtt@surfaceForcingWind = "z0"
 
     ; finally, save flags used when running this script
@@ -1816,6 +1693,3 @@ begin
     ; save global attributes to file
     fileattdef(fout, globalAtt ) 
     end
-
-
-

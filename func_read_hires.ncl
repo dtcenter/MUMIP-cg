@@ -3,14 +3,15 @@
 ;
 ; performs temporal interpolation if flag_interp = .TRUE.
 ; reads in only level indicated by lev_count
+; if process multiple time stamps, in_file->$variable_name$(0,lev_count,:,:) ---->in_file->$variable_name$(timestep_idx(0),lev_count,:,:)
 ;===============================================================
 
-function func_read_hires(generic_path:string,timestep_path:integer,timestep_idx:integer,time_in:double,\
+function func_read_hires(generic_path:string,timestep_path:integer,timestep_idx:integer,t_step_in:integer,time_in:double,\
                             filename:string,variable_file:string,variable_name:string,\
                             CG_resol:string,UFS_exp:string,region:string,lev_count:integer)
 
 
-local generic_path,timestep_path,timestep_idx,time_in,filename,variable_file,variable_name,\
+local generic_path,timestep_path,timestep_idx,t_step_in,time_in,filename,variable_file,variable_name,\
       CG_resol,UFS_exp,region,lev_count,no_time_slices,t_count,data_path_matr,data_path,in_file,\
       in_data_tmp,var_dims,data_size,data_size_new,in_data,i_dim
 
@@ -24,16 +25,13 @@ begin
 ; 1. work out how many time slices we have in total
   no_time_slices = dimsizes(timestep_idx)
 
+  print(no_time_slices)
+
   do t_count = 0,dimsizes(timestep_path)-1
 
-     ; if (filetype.eq."atm2_2d").or.(filetype.eq."atm4_2d") then
-     ;     data_path_matr = (/generic_path,CG_resol,"/",region,"/",filename,CG_resol,"_",filetype,"_ml_",tostring(timestep_path(t_count)),"T000000Z_",region,".nc"/)
-     ; else
-     ;     data_path_matr = (/generic_path,CG_resol,"/",region,"/",filename,CG_resol,"_",filetype,"_",variable_file,"_ml_",tostring(timestep_path(t_count)),"T000000Z_",region,".nc"/)
-     ; end if
-     data_path_matr = (/generic_path,"/ufs_",CG_resol,"/",region,"/",filename,tostring(timestep_path(t_count)),".",CG_resol,".",variable_file,".",UFS_exp,".",region,".nc"/)
+   data_path_matr = (/generic_path,"/ufs_",CG_resol,"/",region,"/",filename,tostring(timestep_path(t_count)),tostring_with_format(t_step_in*timestep_idx(t_count), "%0.2i"),".",UFS_exp,".",variable_file,".",CG_resol,".",region,".nc"/)
      data_path      = str_concat(data_path_matr)
-     print(data_path_matr)
+     print(data_path)
 
   ;  Input variable dimensions: (time, latitude, longitude) ;
      in_file        = addfile(data_path,"r")
@@ -53,10 +51,10 @@ begin
 
      if (lev_count.eq.999) then
         ; 2D field: only one level available
-        in_data_tmp    = in_file->$variable_name$(timestep_idx(t_count),:,:)
+        in_data_tmp    = in_file->$variable_name$(0,:,:)  ; need to change if process multi time steps, see notes above. Xia. (Mar, 2024)
      else
         ; 3D field
-        in_data_tmp    = in_file->$variable_name$(timestep_idx(t_count),lev_count,:,:)
+        in_data_tmp    = in_file->$variable_name$(0,lev_count,:,:) ; need to change if process multi time steps, see notes above. Xia. (Mar, 2024)
      end if
 
      ; set up the new empty array into which we will put our multiple time data
@@ -97,7 +95,3 @@ begin
   return(in_data)
 
 end
-
-
-
-

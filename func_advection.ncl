@@ -332,13 +332,6 @@ begin
     x_position = tofloat(earth_radius*cos(deg_to_rad*lat_array)*deg_to_rad*lon_array)
     y_position = tofloat(earth_radius*deg_to_rad*lat_array)
 
-;    x_grad_horx_m = center_finite_diff_n(in_data,x_position,False,0,3)
-;    x_grad_hory_m = center_finite_diff_n(in_data,y_position,False,0,2)
-
-;    ; if smoothme = tru, smooth each dimension in turn
-;    x_grad_horx_m = center_finite_diff_o6(in_data,x_position,3,smoothme)
-;    x_grad_hory_m = center_finite_diff_o6(in_data,y_position,2,smoothme)
-
     ; if smoothme = tru, smooth each dimension in turn
     x_grad_horx_m = center_finite_diff_o4(in_data,x_position,3,smoothme)
     x_grad_hory_m = center_finite_diff_o4(in_data,y_position,2,smoothme)
@@ -352,5 +345,3 @@ begin
     return([/x_grad_horx_m,x_grad_hory_m/])
 
 end
-
-

@@ -4,9 +4,9 @@
 #SBATCH --partition=hera    # Specify partition name
 #SBATCH --ntasks=12             # Specify max. number of tasks to be invoked
 #SBATCH --mem-per-cpu=8000     # Specify real memory required per CPU in MegaBytes
-#SBATCH --time=00:30:00        # Set a limit on the total run time
+#SBATCH --time=01:15:00        # Set a limit on the total run time
 #SBATCH --mail-type=FAIL       # Notify user by email in case of job failure
-#SBATCH --account=wrfruc       # Charge resources on this project account
+#SBATCH --account=fv3lam       # Charge resources on this project account
 #SBATCH --output=out.proc_UFS    # File name for standard output
 #SBATCH --error=err.proc_UFS    # File name for standard error output
 
@@ -57,8 +57,8 @@ input_pfx="srw.t12z.natlev"
 input_sfx="mumip_io_3km"
 
 # Required dates: NB. do not span month break.
-day_start=2016081200
-day_end=2016082100
+day_start=2016090100
+day_end=2016091021
 # for looping over levels
 lev_start=0
 lev_end=63
@@ -82,7 +82,8 @@ rm -r ${output_dir}/*
 echo "compute CG files for ${day_start}"
 echo "================================="
 
-## 1. we will compute one weight file which can be used for all remappings - this is the time consuming part of the regridding.
+## 1. we will compute weight files which can be used for all remappings - this is the time consuming part of the regridding.
+# first weight file (e.g., 3km_grid.nc)
 if [[  -f ${resol_target}_grid.nc ]]; then
   # target grid file already exists
   echo "${resol_target}_grid.nc exists"
@@ -93,6 +94,7 @@ else
   cdo -sellonlatbox,${domain_minlon},${domain_maxlon},${domain_minlat},${domain_maxlat} ${resol_target}_grid.nc ${resol_target}_grid_domain.nc
 fi
 
+# second weight file (e.g., UFS_3km_grid_domain_wghts.nc), requires src_SCRIP.nc to generate
 if [[  -f UFS_${resol_target}_grid_domain_wghts.nc ]]; then
   # weight file already exists
   echo "UFS_${resol_target}_grid_domain_wghts.nc exists"
@@ -102,13 +104,11 @@ else
   echo "create UFS_${resol_target}_grid_domain_wghts.nc"
   wgrib2  ${fixed_file}.grib2 -match '^(1335):' -netcdf ${fixed_file}.gh.nc
   cdo -P 16 --cellsearchmethod spherepart gencon,${resol_target}_grid_domain.nc -setgrid,src_SCRIP.nc ${fixed_file}.gh.nc UFS_${resol_target}_grid_domain_wghts.nc
-  # cdo -P 16 --cellsearchmethod spherepart gencon,${resol_target}_grid.nc -selname,cell_area ${generic_path}/grid_area.nc UFS_${resol_target}_grid_wghts.nc
-  # cdo gendis,${resol_target}_grid_domain.nc ${fixed_file}.gh.nc UFS_${resol_target}_grid_domain_remapdis_wghts.nc
-
 fi
 
 
 # repeat the above for a particular region (needed for theta computation)
+# first weight file (e.g., 3km_grid_IO.nc)
 if [[  -f ${resol_target}_grid_${region}.nc ]]; then
   echo "${resol_target}_grid_${region}.nc exists"
 else
@@ -117,24 +117,20 @@ else
   cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} ${resol_target}_grid.nc ${resol_target}_grid_${region}.nc
 fi
 
+# second weight file (e.g., UFS_3km_grid_IO_wghts.nc), requires src_SCRIP.nc to generate
 if [[  -f UFS_${resol_target}_grid_${region}_wghts.nc ]]; then
   echo "UFS_${resol_target}_grid_${region}_wghts.nc exists"
 else
   # create subsetted weight file
   echo "UFS_${resol_target}_grid_${region}_wghts.nc"
-  # cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} -setgrid,${output_dir_nat}/grid_cell_area.nc ${generic_path}/grid_area.nc UFS_grid_${region}.nc
-  # create grid description file UFS_grid
   cdo griddes ${resol_target}_grid_${region}.nc > UFS_grid
   cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} ${fixed_file}.gh.nc ${fixed_file}.gh.${region}.nc
-  # cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} -setgrid,${preproc_dir}/UFS_grid_latlon ${preproc_dir}/grid_area.nc UFS_grid_${region}.nc 
-  # cdo -P 16 --cellsearchmethod spherepart gencon,${resol_target}_grid_${region}.nc -selname,cell_area UFS_grid_${region}.nc UFS_${resol_target}_grid_wghts_${region}.nc
   cdo -P 16 --cellsearchmethod spherepart gencon,${resol_target}_grid_${region}.nc -setgrid,src_SCRIP.${region}.nc ${fixed_file}.gh.${region}.nc UFS_${resol_target}_grid_${region}_wghts.nc
-  # cdo gendis,${resol_target}_grid_${region}.nc ${fixed_file}.gh.${region}.nc UFS_${resol_target}_grid_${region}_remapdis_wghts.nc
 fi
 
 ## 2. Regrid using these weights.
 
-# create output directory if needed
+# create output directories if needed
 if [[ ! -d $output_dir ]]; then
   echo "create output directory"
   mkdir ${output_dir}
@@ -156,14 +152,12 @@ else
   wgrib2 ${fixed_file}.HGT.grib2.tmp -for_n 1:64 -grib ${fixed_file}.HGT.grib2
   cdo -f nc4 copy ${fixed_file}.HGT.grib2 ${fixed_file}_HGT.nc
   wgrib2 ${fixed_file}.grib2 -match '^(1335|1386|1533):' -netcdf ${fixed_file}_vgrid.nc
-  # cdo -merge rrfs.t00z.natlev.f006.eurec4a_${ufs_resol}_vgrid.nc rrfs.t00z.natlev.f006.eurec4a_${ufs_resol}.HGT.nc rrfs.t00z.natlev.f006.eurec4a_${ufs_resol}_VGIRD.nc
 
- # create regrided height data
+# create regrided height data
 echo "create regridded height data for ${resol_target} grid"
 cdo -P 4 -O -f nc remap,${resol_target}_grid_domain.nc,UFS_${resol_target}_grid_domain_wghts.nc ${fixed_file}_vgrid.nc ${fixed_file}_${resol_target}_vgrid.nc
 cdo -P 4 -O -f nc remap,${resol_target}_grid_domain.nc,UFS_${resol_target}_grid_domain_wghts.nc ${fixed_file}_HGT.nc ${fixed_file}_${resol_target}_HGT.nc
 cdo -merge ${fixed_file}_${resol_target}_vgrid.nc ${fixed_file}_${resol_target}_HGT.nc ${output_dir}/${fixed_file}_${resol_target}_VGRID.nc
-#cdo -P 4 -O -f nc remap,${resol_target}_grid_domain.nc,UFS_${resol_target}_grid_domain_remapdis_wghts.nc rrfs.t00z.natlev.f006.eurec4a_${ufs_resol}_VGIRD.nc rrfs.t00z.natlev.f006.eurec4a_${ufs_resol}_${resol_target}_VGIRD.nc
 echo "    extract vgrid desired region"
 cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} ${output_dir}/${fixed_file}_${resol_target}_VGRID.nc ${output_dir}/${region}/${fixed_file}_${resol_target}_VGRID_${region}.nc
 fi
@@ -177,7 +171,7 @@ rm -r ${fixed_file}_HGT.nc
 ##>> 3D fields
 ##pres t w u v qv tot_qc_dia tot_qi_dia
 
-# for vari in pres t w u v qv tot_qc_dia tot_qi_dia
+ for vari in pres t w u v qv tot_qc_dia tot_qi_dia
 
 
 for vari in PRES TMP VVEL DZDT UGRD VGRD SPFH CLMR ICMR
@@ -203,18 +197,15 @@ done
 ############################################
 ##>> 2D fields atm2
 # ICON: hfls(surface latent heat flux, positive upwards)  hfss(surface sensible heat flux, DEPHY sign convention: postive upwards) ps (surface pressure) pr(precipitation) clt(cloud cover)
-# UFS: LHTFL:surface (883),SHTFL:surface (882), PRES:surface (807), APCP Total Precipitation (kh m-2, 851) ,TCDC (920)
+# UFS: LHTFL:surface,SHTFL:surface, PRES:surface, APCP Total Precipitation (kh m-2) ,TCDC
 # ICON: ts(surface temp) hus(qv_s) tauu(u momentum flux, ustar) tauv (v momentum flux)
-# UFS:TMP:surface (809),SPFH:surface (811),UFLX:surface (880),VFLX:surface (881)
+# UFS:TMP:surface,SPFH:surface,UFLX:surface,VFLX:surface
 current_time="${day_start}"
 while [[ "${current_time}" -le "$day_end" ]]; do
   echo "${current_time}"
 
-  # grib_ids=(883 882 807 851 920 809 811 880 881)
-  grib_ids=(1392 1391 1334 1367 1415 1336 1338 1389 1390)
+  grib_ids=(1391 1390 1334 1367 1423 1336 1338 1388 1389)
   vars=("LHTFL" "SHTFL" "ps" "APCP" "TCDC" "ts" "qv_s" "UFLX" "VFLX")
-  # grib_ids=(1415)
-  # vars=("TCDC")
   for index in "${!grib_ids[@]}";do
     grib_id="${grib_ids[$index]}"
     var="${vars[$index]}"
@@ -227,7 +218,7 @@ while [[ "${current_time}" -le "$day_end" ]]; do
 
     echo "extract desired region"   
     cdo -sellonlatbox,${minlon},${maxlon},${minlat},${maxlat} ${output_dir}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.nc ${output_dir}/${region}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.${region}.nc
-    if [ ${grib_id} -eq 1415 ];then
+    if [ ${grib_id} -eq 1423 ];then
       echo "removing extra lev dimension for TCDC"
       cdo vertsum ${output_dir}/${region}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.${region}.nc ${output_dir}/${region}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.${region}.tmp.nc
       mv ${output_dir}/${region}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.${region}.tmp.nc ${output_dir}/${region}/${input_pfx}.${current_time}.${input_sfx}.${var}.${resol_target}.${region}.nc
@@ -235,5 +226,3 @@ while [[ "${current_time}" -le "$day_end" ]]; do
   done
   current_time=$(date -d "${current_time:0:8} ${current_time:8} 3 hours" +%Y%m%d%H)
 done
-
-
