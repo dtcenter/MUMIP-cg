@@ -1,33 +1,57 @@
-# README.txt
+README.txt
 
-Original Author: Hannah Christensen, 5 September 2022
-Revised by: Xia Sun, Sep 12, 2023
-Revised by: Julia Simonson, May 30, 2025
+Julia Simonson, 30 May 2025
 
-===
-
-proc_UFS.sh
-
-- this coarse grains the main 3D variables of state together with assorted 2D driving 
-  and diagnostic fields
-
-===
-
-Two further scripts are provided. These two scripts compute additional variables 
-"accurately" (i.e. on the fine grid).
-
-These two scripts must be run if the following flags are set 'true' in coarsen_ufs_manyt.ncl
- flag_accurate_r      = True
- flag_accurate_thetal = True
+Removed unused, commented out code
 
 
-proc_UFS_derived.sh
+Xia Sun, 13 September 2023
 
-- this computes mixing ratios (rv, ql, qi, qt, and rt) on the fine resolution UFS LAM grid before 
-  coarse-graining to the desired resolution
+NCL files to produce DEPHY-standard SCM input for the MUMIP project using Unified Forecast System (UFS) outputs
 
-proc_UFS_derived_2.sh
 
-- as for proc_UFS_derived.sh, except it computes theta and theta_l.
-- proc_UFS_derived_2.sh assumes proc_UFS_derived.sh has been run first, as some files
-  are re-used
+Hannah Christensen, 5 September 2022
+
+NCL files to produce DEPHY-standard SCM input for the MUMIP project
+
+====
+
+Changes for v2.0
+- bug removed in surface fields:
+       These fields were saved in DYAMOND every 15 min not every 3 hr 
+       so have a different time coordinate to the other variables.
+       Correction made in preprocessing scripts and safety flag added 
+       to check time coordinate in func_read_hires.ncl
+
+- all variables saved as floats not double
+       Changes made in func_advtend.ncl and func_grostrophic.ncl
+
+- New derived variables: theta_l, mixing ratios
+       Can either be computed accurately using raw ICON data before coarsening,
+       or approximately within ncl scripts using low-resolution state variables
+        - To do former, run proc_ICON_derived.ksh and proc_ICON_derived_2.ksh
+       prior to running ncl scripts. Then in ncl scripts, set 
+       flag_accurate_r = True and flag_accurate_thetal = True
+        - To do latter, in ncl scripts, set 
+       flag_accurate_r = False and flag_accurate_thetal = False
+
+- New output: advective tendencies
+       Advective tendencies for theta_l and mixing ratios computed and archived.
+
+- Assorted changes to run on Levante as opposed to Mistral
+       Changes in GRIB variable interpretation file on Levante, led to
+       changes in variable names
+
+- Memory issues improved in preprocessing scripts
+       For derived variables, compute fields one model level at a time.
+
+
+====
+
+Version 1.0
+- perform initial coarsening using cdo
+- consider small region over Indian Ocean
+- only first few timesteps
+- resultant files not yet tested on SCM
+
+
